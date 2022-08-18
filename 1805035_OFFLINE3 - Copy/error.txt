@@ -1,0 +1,3 @@
+Error at line 29:  Total number of arguments mismatch in function foo
+
+0 1

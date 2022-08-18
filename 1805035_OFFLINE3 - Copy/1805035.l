@@ -221,6 +221,11 @@ ILL_FORMED_FLOAT {FLOAT}([.][0-9]+([Ee][+-]?[0-9]+)?)+
           logfile<<"Line No. "<<line_count<<" Token : INCOP Lexeme : "<<yytext<<" "<<endl;
           return INCOP;
           }
+{DECOP}  {token<<" <DECOP,"<<yytext<<">";
+          yylval.symbol_val=new SymbolInfo(yytext,"OP");
+          logfile<<"Line No. "<<line_count<<" Token : DECOP Lexeme : "<<yytext<<" "<<endl;
+          return DECOP;
+          }
 {ADDOP} {token<<" <ADDOP,"<<yytext<<">";
         yylval.symbol_val=new SymbolInfo(yytext,"OP");
           logfile<<"Line No. "<<line_count<<" Token : ADDOP Lexeme : "<<yytext<<" "<<endl;

@@ -3,5 +3,5 @@ g++  -w -c -o y.o y.tab.c
 flex 1805035.l
 g++  -w -c -o l.o lex.yy.c 
 g++  *.cpp  -o a.out y.o l.o -lfl -g
-# ./a.out  input.txt
-./a.out  testcases/test2_i.c
+./a.out  input.txt
+# ./a.out  testcases/test5_i.c

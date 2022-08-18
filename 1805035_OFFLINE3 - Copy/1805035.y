@@ -64,7 +64,7 @@ void checkParameterUniquenessForFunDefinition(){
 			logfile2<<i<<"----"<<name<<" "<<type<<endl;
 			currentSymbol->setType("ID");
 			currentSymbol->typeOfVar = type;
-			currentSymbol->offset=currentOffset;
+			currentSymbol->offset=(i)*2;
 			
 			if(name==""){
 				errorfile<<"Error at line "<<line_count-1<<" :"<<i+1<<"th parameter's name not given in function definition  "<<currentSymbol->getName()<<" in parameter"<<endl<<endl;
@@ -79,14 +79,11 @@ void checkParameterUniquenessForFunDefinition(){
 			}
 			
 
-		/****************************ICG CODE ***************************************/
-			currentSymbol->functionParameterOffset.push_back(currentOffset);
-			asmCode<<"\tPUSH [BP-"<<currentOffset<<"]"<<endl;
-			currentOffset+=2;
+		
 	}
 	
 	}
-	asmCode<<"\tMOV BP,SP"<<endl;
+	
 	temporaryParameterList.clear();
 }
 void parameterUniquenessCheckforDeclaration(){
@@ -175,7 +172,7 @@ string output_procedure ="\nPRINT_FUNC PROC\
 						\n\tRET\
 						\nPRINT_FUNC ENDP\n\n";
 string whileLabel,whileEnd,conditionEnd,elseLabel,forLoopStart,ENDLOOP,IncLabel,LoopLabel;
-
+stack<string>conditionStack;
 %}
 %union {double double_val; int integer_val;char char_val ; SymbolInfo* symbol_val;}
 %token<symbol_val> IF ELSE FOR DO NOT FLOAT INT VOID CHAR DOUBLE WHILE RETURN CONTINUE LPAREN RPAREN LCURL RCURL COMMA SEMICOLON LTHIRD RTHIRD PRINTLN
@@ -596,9 +593,16 @@ type_specifier ID LPAREN parameter_list  RPAREN
 	else
 		asmCode<< $2->getName()<<" PROC"<<endl;
 	temporaryOffset=currentOffset;
-	currentOffset=2;
+	currentOffset=0;
 	
-	
+	for(int i=0;i<temporaryParameterList.size();i++){
+		/****************************ICG CODE ***************************************/
+			currentSymbol->functionParameterOffset.push_back(currentOffset);
+			asmCode<<"\tMOV AX, [BP-"<<i*2<<"]\nPUSH AX"<<endl;
+			
+			currentOffset+=2;
+	}
+	asmCode<<"\tMOV BP,SP"<<endl;
 		
 }
 
@@ -615,12 +619,13 @@ type_specifier ID LPAREN parameter_list  RPAREN
 	
 		| type_specifier ID LPAREN RPAREN{
 
-
+			temporaryOffset=currentOffset;
+			currentOffset=0;
 			if($2->getName() == "main")
 				asmCode<< "MAIN PROC\n\tMOV AX, @DATA\n\tMOV DS, AX\n";
 			else
 				asmCode<< $2->getName()<<" PROC"<<endl;
-
+			asmCode<<"\tMOV BP,SP"<<endl;
 		} compound_statement{
 
 
@@ -659,7 +664,7 @@ type_specifier ID LPAREN parameter_list  RPAREN
 					asmCode<<"MOV AH, 4CH\nMOV AL, 01 ;your return code.\nINT 21H\nMAIN ENDP"<<endl;
 				else
 					asmCode<<"\n\tRET\n"<<$2->getName()<<" ENDP\n\n";
-				
+				currentOffset=temporaryOffset;
 			}
  		;				
 
@@ -899,13 +904,17 @@ statement : var_declaration
 	  | CONDITIONAL_STATEMENT RPAREN statement ELSE{
 		elseLabel=conditionEnd;
 		conditionEnd=string(newLabel());
+		asmCode<<";jmp phase"<<endl;
 		asmCode<<"\tJMP "<<conditionEnd<<endl;
-	  	asmCode<<"\t"<<elseLabel<<":"<<endl;
+	  	conditionStack.push(conditionEnd);
+		asmCode<<"\t"<<elseLabel<<":"<<endl;
 	  }  statement{
 		asmCode<<";condition statements3"<<endl;
 	 	$$ = new SymbolInfo($1->getName()+")"+$3->getName()+"else"+$6->getName(),"if");
 	 	logfile2<<"Line "<<line_count<<": statement : IF LPAREN expression RPAREN statement ELSE statement"<<endl<<endl<<$$->getName()<<endl<<endl;
-	 	asmCode<<"\t"<<conditionEnd<<":"<<endl;
+	 	conditionEnd=conditionStack.top();
+		conditionStack.pop();
+		asmCode<<"\t"<<conditionEnd<<":"<<endl;
 
 	 }
 	  | WHILE{
@@ -952,6 +961,7 @@ CONDITIONAL_STATEMENT  :IF LPAREN expression{
 	//MARKER2
 	$$ = new SymbolInfo("if("+$3->getName(),"");
 	 conditionEnd=string(newLabel());
+	 asmCode<<"\t;if else  "<<endl;
 		asmCode<<"\tCMP AX,0\n\tJE "<<conditionEnd<<endl;
 	  }	  
 expression_statement 	: SEMICOLON	{$$ = new SymbolInfo(";","expression");}		
@@ -1309,7 +1319,14 @@ factor	: variable {
 
 
 		SymbolInfo* currentSymbol = table->LookUp($1->getName());
-
+		/****************ICG CODE**************************/
+		
+		asmCode<<"\tMOV TEMPORARY_VALUE,BP\n\tMOV BP,SP"<<endl;
+		
+		
+		asmCode<<"\tCALL "<<$1->getName()<<"\n\tMOV BP, TEMPORARY_VALUE"<<endl;
+		asmCode<<"\tPUSH FUNC_RETURN_VALUE"<<endl;
+		/*********************************************************/
 		if(currentSymbol==NULL){
 			printError("Undeclared or Undefined Function",$1->getName());
 			$3->functionParameterList.clear();
@@ -1318,7 +1335,7 @@ factor	: variable {
 				if(currentSymbol->isFunction)
 				{
 					//CHECK NUMER OF ARGUMENTS ARE EQUAL!!!
-					int given_arg_list = $3->functionParameterList.size();
+					int given_arg_list = $4->functionParameterList.size();
 					int defined_arg_list = currentSymbol->functionParameterList.size();
 
 					if(given_arg_list!=defined_arg_list){
@@ -1357,20 +1374,13 @@ factor	: variable {
 		
 
 		}
-		/****************ICG CODE**************************/
-		asmCode<<"\tMOV TEMPORARY_VALUE,BP\n\tMOV BP,SP"<<endl;
-		for(int i=0;$3->functionParameterOffset.size();i++){
-			asmCode<<"\tPUSH "<<$3->functionParameterList[i].first<<endl;
-
-		}
-		asmCode<<"\tCALL "<<$1->getName()<<"\n\tMOV BP, TEMPORARY_VALUE"<<endl;
-		asmCode<<"\tPUSH FUNC_RETURN_VALUE"<<endl;
+		
 		}
 	| LPAREN expression RPAREN{
 	
 	$$=new SymbolInfo("("+$2->getName()+")",$2->getType());
 	printMSG("factor : LPAREN expression RPAREN",$$->getName());
-
+	asmCode<<"\tPUSH AX"<<endl;
 }
 	| CONST_INT {
 			$$ = $1;						
@@ -1399,12 +1409,14 @@ factor	: variable {
 			/*****************************ICG CODE*****************/
 			
 			if($1->isGlobal){
-				asmCode<<"\tINC [SI]"<<endl;
+				
 				asmCode<<"\tPUSH [SI]"<<endl;
+				asmCode<<"\tINC [SI]"<<endl;
 			}
 				else {
-					asmCode<<"\tINC [BP+SI]"<<endl;
+					
 					asmCode<<"\t PUSH [BP+SI] "<<endl;
+					asmCode<<"\tINC [BP+SI]"<<endl;
 				}
 			
 
@@ -1414,12 +1426,14 @@ factor	: variable {
 		 	logfile2<<"Line "<<line_count<<": factor : variable DECOP"<<endl<<endl<<$$->getName()<<endl<<endl;		
 			/*****************************ICG CODE*****************/
 			if($1->isGlobal){
-				asmCode<<"\tINC [SI]"<<endl;
+				
 				asmCode<<"\tPUSH [SI]"<<endl;
+				asmCode<<"\tINC [SI]"<<endl;
 			}
 				else {
-					asmCode<<"\tINC [BP+SI]"<<endl;
+					
 					asmCode<<"\t PUSH [BP+SI] "<<endl;
+					asmCode<<"\tDEC [BP+SI]"<<endl;
 				}
 		} 	
 	
@@ -1446,6 +1460,7 @@ arguments : arguments COMMA logic_expression {
 	}else{
 		$$->functionParameterList=$1->functionParameterList;  
 		$$->functionParameterList.push_back(make_pair(name,variable_type));
+		asmCode<<"\tPUSH AX"<<endl;
 	}
 
 	
@@ -1456,6 +1471,7 @@ arguments : arguments COMMA logic_expression {
 			string variable_type = $1->getType();
 			printMSG("arguments : logic_expression",$$->getName());
 			$$->functionParameterList.push_back(make_pair(name,variable_type));
+		  	asmCode<<"\tPUSH AX"<<endl;
 		  }
 	      ;
 

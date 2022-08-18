@@ -3,6 +3,9 @@
 .DATA
 FUNC_RETURN_VALUE DW ?
 TEMPORARY_VALUE DW ?
+a  DW ?
+b  DW ?
+c  DW ?
 .CODE
 
 PRINT_FUNC PROC						
@@ -54,6 +57,74 @@ PRINT_LOOP:
 	RET						
 PRINT_FUNC ENDP
 
+func_a PROC
+	MOV BP,SP
+	LEA SI,a
+	MOV DI,SI
+	PUSH 7
+	POP AX 
+	;******************************
+MOV [DI],AX
+
+	RET
+func_a ENDP
+
+foo PROC
+	MOV AX, [BP-0]
+PUSH AX
+	MOV BP,SP
+	MOV SI,-0
+	MOV DI,SI
+	MOV SI,-0
+	 PUSH [BP-SI] 
+	POP AX 
+	MOV CX,AX
+	PUSH 3
+	POP AX 
+	ADD AX,CX
+	;******************************
+	MOV [BP+DI], AX
+	MOV SI,-0
+	 PUSH [BP-SI] 
+	POP AX 
+	MOV FUNC_RETURN_VALUE,AX
+
+	RET
+foo ENDP
+
+bar PROC
+	MOV AX, [BP-0]
+PUSH AX
+	MOV AX, [BP-2]
+PUSH AX
+	MOV BP,SP
+	PUSH 0
+	MOV SI,-4
+	MOV DI,SI
+	PUSH 4
+	POP AX 
+	MOV SI,-0
+	 PUSH [BP-SI] 
+	POP BX
+	MUL BX 
+	MOV CX,AX
+	PUSH 2
+	POP AX 
+	MOV SI,-2
+	 PUSH [BP-SI] 
+	POP BX
+	MUL BX 
+	ADD AX,CX
+	;******************************
+	MOV [BP+DI], AX
+	MOV SI,-4
+	 PUSH [BP-SI] 
+	POP AX 
+	MOV FUNC_RETURN_VALUE,AX
+
+	RET
+bar ENDP
+
 MAIN PROC
 	MOV AX, @DATA
 	MOV DS, AX
@@ -61,141 +132,41 @@ MAIN PROC
 	PUSH 0
 	PUSH 0
 	PUSH 0
-	MOV SI,-2
+	PUSH 0
+	MOV SI,-0
 	MOV DI,SI
-	PUSH 3
-	POP AX 
-	;******************************
-	MOV [BP+DI], AX
-	MOV SI,-4
-	MOV DI,SI
-	PUSH 8
-	POP AX 
-	;******************************
-	MOV [BP+DI], AX
-	MOV SI,-6
-	MOV DI,SI
-	PUSH 6
-	POP AX 
-	;******************************
-	MOV [BP+DI], AX
-	MOV SI,-2
-	 PUSH [BP-SI] 
-	POP AX 
-	MOV DX,AX
-	PUSH 3
-	POP AX 
-	CMP DX,AX
-	JE L0
-	MOV AX,0
-	JMP L1
-L0:	MOV AX,1
-L1:
-	CMP AX,0
-	JE L2
-	MOV BP,SP
-	MOV AX,[BP-4]
-	CALL PRINT_FUNC
-	L2:
-	MOV SI,-4
-	 PUSH [BP-SI] 
-	POP AX 
-	MOV DX,AX
-	PUSH 8
-	POP AX 
-	CMP DX,AX
-	JL L3
-	MOV AX,0
-	JMP L4
-L3:	MOV AX,1
-L4:
-	CMP AX,0
-	JE L5
-	MOV BP,SP
-	MOV AX,[BP-2]
-	CALL PRINT_FUNC
-	JMP L6
-	L5:
-	MOV BP,SP
-	MOV AX,[BP-6]
-	CALL PRINT_FUNC
-;condition statements3
-	L6:
-	MOV SI,-6
-	 PUSH [BP-SI] 
-	POP AX 
-	MOV DX,AX
-	PUSH 6
-	POP AX 
-	CMP DX,AX
-	JNE L7
-	MOV AX,0
-	JMP L8
-L7:	MOV AX,1
-L8:
-	CMP AX,0
-	JE L9
-	MOV BP,SP
-	MOV AX,[BP-6]
-	CALL PRINT_FUNC
-	JMP L10
-	L9:
-	MOV SI,-4
-	 PUSH [BP-SI] 
-	POP AX 
-	MOV DX,AX
-	PUSH 8
-	POP AX 
-	CMP DX,AX
-	JG L11
-	MOV AX,0
-	JMP L12
-L11:	MOV AX,1
-L12:
-	CMP AX,0
-	JE L13
-	MOV BP,SP
-	MOV AX,[BP-4]
-	CALL PRINT_FUNC
-	JMP L14
-	L13:
-	MOV SI,-2
-	 PUSH [BP-SI] 
-	POP AX 
-	MOV DX,AX
 	PUSH 5
 	POP AX 
-	CMP DX,AX
-	JL L15
-	MOV AX,0
-	JMP L16
-L15:	MOV AX,1
-L16:
-	CMP AX,0
-	JE L17
-	MOV BP,SP
-	MOV AX,[BP-2]
-	CALL PRINT_FUNC
-	JMP L18
-	L17:
-	MOV BP,SP
-	MOV SI,-6
+	;******************************
+	MOV [BP+DI], AX
+	MOV SI,-2
 	MOV DI,SI
-	PUSH 0
+	PUSH 6
 	POP AX 
 	;******************************
 	MOV [BP+DI], AX
-	MOV AX,[BP-6]
-	CALL PRINT_FUNC
-;condition statements3
-	L18:
-;condition statements3
-	L18:
-;condition statements3
-	L18:
-	PUSH 0
+	MOV TEMPORARY_VALUE,BP
+	MOV BP,SP
+	CALL func_a
+	MOV BP, TEMPORARY_VALUE
+	PUSH FUNC_RETURN_VALUE
 	POP AX 
-	MOV FUNC_RETURN_VALUE,AX
+	MOV AX,a
+	CALL PRINT_FUNC
+	MOV SI,-4
+	MOV DI,SI
+	MOV SI,-0
+	 PUSH [BP-SI] 
+	POP AX 
+	PUSH AX
+	MOV TEMPORARY_VALUE,BP
+	MOV BP,SP
+	CALL foo
+	MOV BP, TEMPORARY_VALUE
+	PUSH FUNC_RETURN_VALUE
+	POP AX 
+	;******************************
+	MOV [BP+DI], AX
 MOV AH, 4CH
 MOV AL, 01 ;your return code.
 INT 21H

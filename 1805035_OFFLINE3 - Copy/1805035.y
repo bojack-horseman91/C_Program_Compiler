@@ -26,6 +26,7 @@ vector< pair<string,string> > temporaryParameterList ;
 int currentOffset=2,temporaryOffset=2;
 vector<SymbolInfo*>declared_varList;
 vector<SymbolInfo*>My_parameter_list;
+int temporaryPushNumber=0,numberOfPushes=0;
 
 void yyerror(char *s)
 {
@@ -599,10 +600,13 @@ type_specifier ID LPAREN parameter_list  RPAREN
 		/****************************ICG CODE ***************************************/
 			currentSymbol->functionParameterOffset.push_back(currentOffset);
 			asmCode<<"\tMOV AX, [BP-"<<i*2<<"]\nPUSH AX"<<endl;
+			numberOfPushes++;
 			
 			currentOffset+=2;
 	}
+	temporaryPushNumber=numberOfPushes;
 	asmCode<<"\tMOV BP,SP"<<endl;
+	numberOfPushes=0;
 		
 }
 
@@ -611,6 +615,10 @@ type_specifier ID LPAREN parameter_list  RPAREN
 		printMSG("func_definition : type_specifier ID LPAREN parameter_list RPAREN compound_statement",$$->getName());
 		temporaryParameterList.clear();
 		currentOffset=temporaryOffset;
+		for(int i=0;i<numberOfPushes;i++){
+			asmCode<<"POP AX"<<endl;
+		}
+		numberOfPushes=temporaryPushNumber;
 		if($2->getName() == "main")
 			asmCode<<"MOV AH, 4CH\nMOV AL, 01 ;your return code.\nINT 21H\nMAIN ENDP"<<endl;
 		else
@@ -770,6 +778,7 @@ declaration_list : declaration_list COMMA ID {
 									$3->offset=currentOffset;
 									currentOffset+=2;
 									asmCode<<"\tPUSH 0\n";
+									numberOfPushes++;
 								}
 			/****************************************************************************/
 				if(!table->Insert($3)){
@@ -800,8 +809,10 @@ declaration_list : declaration_list COMMA ID {
 								int len=stoi($5->getName().c_str());
 								$3->offset=currentOffset;
 								currentOffset+=2*len;
-								for(int i=0;i<len;i++)
+								for(int i=0;i<len;i++){
 									asmCode<<"\tPUSH 0\n";
+									numberOfPushes++;
+									}
 							}
 			/****************************************************************************/
 				$3->setType("array");
@@ -822,6 +833,7 @@ declaration_list : declaration_list COMMA ID {
 								$1->offset=currentOffset;
 								currentOffset+=2;
 								asmCode<<"\tPUSH 0\n";
+								numberOfPushes++;
 							}
 			/****************************************************************************/
 				if(!table->Insert($1)){
@@ -839,8 +851,10 @@ declaration_list : declaration_list COMMA ID {
 								int len=stoi($3->getName().c_str());
 								$1->offset=currentOffset;
 								currentOffset+=2*len;
-								for(int i=0;i<len;i++)
+								for(int i=0;i<len;i++){
 									asmCode<<"\tPUSH 0\n";
+									numberOfPushes++;
+									}
 							}
 			/****************************************************************************/
 				$1->setLen(atoi($3->getName().c_str()));
@@ -1100,6 +1114,7 @@ logic_expression : rel_expression 	{
 	 }
 		 | rel_expression {
 			asmCode<<"\tPUSH AX"<<endl;
+			numberOfPushes++;
 		 } LOGICOP rel_expression {
 	 	$$ = new SymbolInfo($1->getName()+$3->getName()+$4->getName(),"expression");
 	 	// logfile2<<"Line "<<line_count<<": logic_expression : rel_expression LOGICOP rel_expression"<<endl<<endl;
@@ -1117,6 +1132,7 @@ logic_expression : rel_expression 	{
 	 	logfile2<<"Line "<<line_count<<": logic_expression : rel_expression LOGICOP rel_expression"<<endl<<endl<<$$->getName()<<endl<<endl;
 	 	/**********************ICG CODE***********************************************/
 		asmCode<<"\tPOP BX"<<endl;
+		numberOfPushes--;
 		string sign=$3->getName();
 		string label1=string(newLabel()),label2=string(newLabel());
 		if(sign== "&&"){
@@ -1223,6 +1239,7 @@ term :unary_expression{
 				
 				
 				asmCode<<"\tPOP AX "<<endl;
+				numberOfPushes--;
 			/********************************************************************************/
 		}
      |  term MULOP unary_expression{
@@ -1255,16 +1272,21 @@ term :unary_expression{
 
 			/*****************************ICG CODE *******************************************/
 				asmCode<<"\tPOP BX"<<endl;
+				numberOfPushes--;
 				if($2->getName()=="*")	
 					asmCode<<"\tMUL BX "<<endl;
 				else if($2->getName()=="%"){
 					asmCode<<"\tPUSH DX"<<endl;
+					numberOfPushes++;
 					asmCode<<"\n\tXOR DX, DX"<<endl;
 					asmCode<<"\tDIV BX\n\tMOV AX, DX\n\n\tPOP DX"<<endl;
+					numberOfPushes--;
 				}else{
 					asmCode<<"\tPUSH DX"<<endl;
+					numberOfPushes++;
 					asmCode<<"\n\tXOR DX, DX"<<endl;
 					asmCode<<"\tDIV BX\n\n\tPOP DX"<<endl;
+					numberOfPushes--;
 				}
 			/********************************************************************************/			
 			
@@ -1279,8 +1301,10 @@ unary_expression : ADDOP unary_expression {
 		 	/*****************************ICG CODE ***************************************/
 			if($1->getName()=="-"){
 				asmCode<<"\tPOP BX"<<endl;
+				numberOfPushes--;
 				asmCode<<"\tNEG BX"<<endl;
 				asmCode<<"\tPUSH BX"<<endl;
+				numberOfPushes++;
 			}
 			/****************************************************************************/
 		 }   
@@ -1289,8 +1313,10 @@ unary_expression : ADDOP unary_expression {
 		 	logfile2<<"Line "<<line_count<<": unary_expression : NOT unary_expression"<<endl<<endl<<$$->getName()<<endl<<endl;
 		 	/*****************************ICG CODE ***************************************/
 			    asmCode<<"\tPOP BX"<<endl;
+				numberOfPushes--;
 				asmCode<<"\tNOT [SP]"<<endl;
 				asmCode<<"\tPUSH BX"<<endl;
+				numberOfPushes++;
 			
 			/****************************************************************************/
 		 }
@@ -1305,9 +1331,12 @@ factor	: variable {
 			$$ = $1;		 	
 		 	logfile2<<"Line "<<line_count<<": factor : variable"<<endl<<endl<<$$->getName()<<endl<<endl;		
 			/*****************************ICG CODE *******************************************/
-				if($1->isGlobal)
+				if($1->isGlobal){
 					asmCode<<"\t PUSH [SI] "<<endl;
+					numberOfPushes++;
+					}
 				else {
+					numberOfPushes++;
 					asmCode<<"\t PUSH [BP-SI] "<<endl;
 				}
 			/********************************************************************************/
@@ -1326,6 +1355,7 @@ factor	: variable {
 		
 		asmCode<<"\tCALL "<<$1->getName()<<"\n\tMOV BP, TEMPORARY_VALUE"<<endl;
 		asmCode<<"\tPUSH FUNC_RETURN_VALUE"<<endl;
+		numberOfPushes++;
 		/*********************************************************/
 		if(currentSymbol==NULL){
 			printError("Undeclared or Undefined Function",$1->getName());
@@ -1388,6 +1418,7 @@ factor	: variable {
 			/*******************************ICG CODE****************************************************/
 
 				asmCode<<"\tPUSH "<<$1->getName()<<endl;
+				numberOfPushes++;
 				
 
 			/********************************************************************************/	 	
@@ -1399,6 +1430,7 @@ factor	: variable {
 			/*******************************ICG CODE****************************************************/
 
 				asmCode<<"\tPUSH"<<$1->getName()<<endl;
+				numberOfPushes++;
 
 			/********************************************************************************/
 		
@@ -1411,11 +1443,13 @@ factor	: variable {
 			if($1->isGlobal){
 				
 				asmCode<<"\tPUSH [SI]"<<endl;
+				numberOfPushes++;
 				asmCode<<"\tINC [SI]"<<endl;
 			}
 				else {
 					
 					asmCode<<"\t PUSH [BP+SI] "<<endl;
+					numberOfPushes++;
 					asmCode<<"\tINC [BP+SI]"<<endl;
 				}
 			
@@ -1428,11 +1462,13 @@ factor	: variable {
 			if($1->isGlobal){
 				
 				asmCode<<"\tPUSH [SI]"<<endl;
+				numberOfPushes++;
 				asmCode<<"\tINC [SI]"<<endl;
 			}
 				else {
 					
 					asmCode<<"\t PUSH [BP+SI] "<<endl;
+					numberOfPushes++;
 					asmCode<<"\tDEC [BP+SI]"<<endl;
 				}
 		} 	
@@ -1461,6 +1497,7 @@ arguments : arguments COMMA logic_expression {
 		$$->functionParameterList=$1->functionParameterList;  
 		$$->functionParameterList.push_back(make_pair(name,variable_type));
 		asmCode<<"\tPUSH AX"<<endl;
+		numberOfPushes++;
 	}
 
 	
@@ -1472,6 +1509,7 @@ arguments : arguments COMMA logic_expression {
 			printMSG("arguments : logic_expression",$$->getName());
 			$$->functionParameterList.push_back(make_pair(name,variable_type));
 		  	asmCode<<"\tPUSH AX"<<endl;
+			numberOfPushes++;
 		  }
 	      ;
 
